@@ -51,13 +51,13 @@ export function fetchPoke() {
             }
 
             const imagePromises = allPokemonData.map(data => {
-                return new Promise<void>((resolve, reject) => {
+                return new Promise<void>((resolve, reject) => { // 'reject' is now available to be used
                     const img = new Image();
                     img.src = data.sprite;
                     img.onload = () => resolve();
                     img.onerror = () => {
-                        console.warn(`Failed to preload image: ${data.sprite}`);
-                        resolve();
+                        console.error(`Failed to preload image: ${data.sprite}`); // Log the error
+                        reject(new Error(`Failed to load image: ${data.sprite}`)); // <-- **THIS IS THE CHANGE**
                     };
                 });
             });
@@ -102,7 +102,7 @@ export function fetchPoke() {
                 const initialLeft = Math.random() * (window.innerWidth - 200);
                 sprite.style.left = `${initialLeft}px`;
                 sprite.style.top = '-100px';
-                sprite.style.opacity = '0'; // Initial state before animation
+                sprite.style.opacity = '0';
 
                 document.body.appendChild(sprite);
 
@@ -111,7 +111,6 @@ export function fetchPoke() {
                     audio.play().catch(e => console.error("Error playing audio:", e));
                 }
 
-                // --- MODIFIED: Apply final position and opacity only on onload ---
                 const applyFinalPosition = () => {
                     const viewportWidth = window.innerWidth;
                     const viewportHeight = window.innerHeight;
@@ -124,19 +123,14 @@ export function fetchPoke() {
 
                     sprite.style.left = `${finalRandomLeft}px`;
                     sprite.style.top = `${finalRandomTop}px`;
-                    sprite.style.opacity = '1'; // Trigger fade-in and fall
+                    sprite.style.opacity = '1';
                 };
 
-                // Attach onload handler
                 sprite.onload = applyFinalPosition;
 
-                // Check if the image is already complete (due to preloading)
-                // If it is, manually trigger the final positioning without waiting for onload
                 if (sprite.complete) {
                     applyFinalPosition();
                 }
-                // --- END MODIFIED ---
-
 
                 setTimeout(() => {
                     if (sprite.parentNode) {
@@ -145,8 +139,8 @@ export function fetchPoke() {
                 }, 7000);
             });
         })
-        .catch(error => {
-            console.error("Error fetching Pokémon data:", error);
+        .catch(error => { // This catch block will now handle image preloading failures as well
+            console.error("Error during application startup (data or image preloading):", error);
             if (loadingStatus) {
                 loadingStatus.textContent = `Error loading Pokémon: ${error.message}`;
                 loadingStatus.classList.remove('loading-message', 'text-green-600');
