@@ -1,84 +1,157 @@
 export function fetchPoke() {
-    let allSprite: string[] = []
+    interface PokemonData {
+        sprite: string;
+        cry: string;
+    }
+
+    let allPokemonData: PokemonData[] = [];
+    const loadingStatus = document.getElementById('loading-status') as HTMLDivElement | null;
+
+    if (loadingStatus) {
+        loadingStatus.textContent = 'Loading Pokémon data... Please wait.';
+        loadingStatus.classList.add('loading-message');
+        loadingStatus.classList.remove('text-green-600', 'text-red-600');
+    }
+
     fetch('https://pokeapi.co/api/v2/pokemon?limit=150')
-        .then(response => response.json())
-        .then(json => {
-            const pokemonList = json.results
-            // Use Promise.all to wait for all individual Pokémon fetches to complete
-            return Promise.all(pokemonList.map((pokemon: any) =>
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then((json: { results: { name: string; url: string; }[] }) => {
+            const pokemonList = json.results;
+
+            return Promise.all(pokemonList.map((pokemon: { name: string; url: string }) =>
                 fetch(pokemon.url)
                     .then(res => {
                         if (!res.ok) {
-                            throw new Error(`HTTP error! status: ${res.status}`);
+                            throw new Error(`HTTP error! status: ${res.status} for ${pokemon.name}`);
                         }
                         return res.json();
                     })
-                    .then(pokeData => {
-                        // Check if sprites and front_default exist before pushing
-                        if (pokeData.sprites && pokeData.sprites.front_default) {
-                            allSprite.push(pokeData.sprites.front_default);
+                    .then((pokeData: { sprites?: { front_default?: string }; cries?: { legacy?: string } }) => {
+                        if (pokeData.sprites?.front_default && pokeData.cries?.legacy) {
+                            allPokemonData.push({
+                                sprite: pokeData.sprites.front_default,
+                                cry: pokeData.cries.legacy
+                            });
                         }
+                    })
+                    .catch(error => {
+                        console.error(`Error fetching data for ${pokemon.name}:`, error);
                     })
             ));
         })
         .then(() => {
-            console.log(allSprite);
+            console.log('Finished fetching Pokémon URLs. Now preloading images...');
+            if (loadingStatus) {
+                loadingStatus.textContent = 'Preloading Pokémon images...';
+            }
 
-            document.addEventListener("click", (event) => {
-                        // Ensure there are sprites to display
-                        if (allSprite.length === 0) {
-                            console.warn("No Pokémon sprites loaded, cannot spawn.");
-                            return;
-                        }
+            const imagePromises = allPokemonData.map(data => {
+                return new Promise<void>((resolve, reject) => {
+                    const img = new Image();
+                    img.src = data.sprite;
+                    img.onload = () => resolve();
+                    img.onerror = () => {
+                        console.warn(`Failed to preload image: ${data.sprite}`);
+                        resolve();
+                    };
+                });
+            });
 
-                        // Create a new image element for the sprite
-                        const sprite = document.createElement("img");
-                        // Select a random sprite from the loaded ones
-                        const randomIndex = Math.floor(Math.random() * allSprite.length);
-                        sprite.src = allSprite[randomIndex];
+            return Promise.all(imagePromises);
+        })
+        .then(() => {
+            console.log('All Pokémon data and sprites preloaded. Application ready.');
 
-                        // Set initial styles for position and visibility
-                        sprite.style.position = 'absolute';
-                        sprite.style.zIndex = '1000'; // Ensure the sprite appears on top of other content
-                        sprite.style.cursor = 'pointer'; // Indicate it's interactive (optional)
-                        sprite.style.maxWidth = '200px'; // Limit sprite size
-                        sprite.style.height = 'auto';
-                        sprite.style.left = `${event.clientX - sprite.offsetWidth / 2}px`; // Position horizontally at click
-                        sprite.style.top = '-100px'; // Start above the viewport for falling animation
+            if (loadingStatus) {
+                if (allPokemonData.length > 0) {
+                    loadingStatus.textContent = 'Pokémon data loaded! Click anywhere to spawn.';
+                    loadingStatus.classList.remove('loading-message', 'text-red-600');
+                    loadingStatus.classList.add('text-green-600');
+                } else {
+                    loadingStatus.textContent = 'Failed to load any Pokémon sprites or cries.';
+                    loadingStatus.classList.remove('loading-message', 'text-green-600');
+                    loadingStatus.classList.add('text-red-600');
+                }
+            }
 
-                        // Append the sprite to the body
-                        document.body.appendChild(sprite);
+            document.addEventListener("click", (event: MouseEvent) => {
+                event.preventDefault();
 
-                        // Once the sprite image has loaded, trigger the animation
-                        sprite.onload = () => {
-                            const viewportWidth = window.innerWidth;
-                            const viewportHeight = window.innerHeight;
+                if (allPokemonData.length === 0) {
+                    console.warn("No Pokémon data loaded, cannot spawn.");
+                    return;
+                }
 
-                            // Get the actual dimensions of the loaded sprite
-                            const spriteWidth = sprite.offsetWidth;
-                            const spriteHeight = sprite.offsetHeight;
+                const randomIndex = Math.floor(Math.random() * allPokemonData.length);
+                const selectedPokemon = allPokemonData[randomIndex];
 
-                            // Calculate random positions within the viewport,
-                            // ensuring the sprite is fully visible and doesn't go off edges.
-                            // The horizontal position is now based on the click event's X coordinate
-                            const randomLeft = Math.random() * (viewportWidth - spriteWidth);
-                            const randomTop = Math.random() * (viewportHeight - spriteHeight);
+                const sprite = document.createElement("img");
+                sprite.src = selectedPokemon.sprite;
 
-                            // Apply the final positions and make it visible to trigger the transition
-                            sprite.style.left = `${randomLeft}px`;
-                            sprite.style.top = `${randomTop}px`;
-                            sprite.style.opacity = '1'; // Fade in
-                        };
+                sprite.style.position = 'absolute';
+                sprite.style.zIndex = '1000';
+                sprite.style.cursor = 'pointer';
+                sprite.style.maxWidth = '200px';
+                sprite.style.height = 'auto';
 
-                        // Optional: Remove the sprite after a short delay (e.g., 5 seconds)
-                        // This prevents too many sprites from cluttering the screen.
-                        setTimeout(() => {
-                            if (sprite.parentNode) {
-                                sprite.parentNode.removeChild(sprite);
-                            }
-                        }, 7000); 
-                    });
-                })
-        }
+                const initialLeft = Math.random() * (window.innerWidth - 200);
+                sprite.style.left = `${initialLeft}px`;
+                sprite.style.top = '-100px';
+                sprite.style.opacity = '0'; // Initial state before animation
 
+                document.body.appendChild(sprite);
+
+                if (selectedPokemon.cry) {
+                    const audio = new Audio(selectedPokemon.cry);
+                    audio.play().catch(e => console.error("Error playing audio:", e));
+                }
+
+                // --- MODIFIED: Apply final position and opacity only on onload ---
+                const applyFinalPosition = () => {
+                    const viewportWidth = window.innerWidth;
+                    const viewportHeight = window.innerHeight;
+
+                    const spriteWidth = sprite.offsetWidth;
+                    const spriteHeight = sprite.offsetHeight;
+
+                    const finalRandomLeft = Math.random() * (viewportWidth - spriteWidth);
+                    const finalRandomTop = Math.random() * (viewportHeight - spriteHeight);
+
+                    sprite.style.left = `${finalRandomLeft}px`;
+                    sprite.style.top = `${finalRandomTop}px`;
+                    sprite.style.opacity = '1'; // Trigger fade-in and fall
+                };
+
+                // Attach onload handler
+                sprite.onload = applyFinalPosition;
+
+                // Check if the image is already complete (due to preloading)
+                // If it is, manually trigger the final positioning without waiting for onload
+                if (sprite.complete) {
+                    applyFinalPosition();
+                }
+                // --- END MODIFIED ---
+
+
+                setTimeout(() => {
+                    if (sprite.parentNode) {
+                        sprite.parentNode.removeChild(sprite);
+                    }
+                }, 7000);
+            });
+        })
+        .catch(error => {
+            console.error("Error fetching Pokémon data:", error);
+            if (loadingStatus) {
+                loadingStatus.textContent = `Error loading Pokémon: ${error.message}`;
+                loadingStatus.classList.remove('loading-message', 'text-green-600');
+                loadingStatus.classList.add('text-red-600');
+            }
+        });
+}
 
