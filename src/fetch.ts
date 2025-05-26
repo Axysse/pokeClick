@@ -1,6 +1,6 @@
 export function fetchPoke() {
     let allSprite: string[] = []
-    fetch('https://pokeapi.co/api/v2/pokemon?limit=150')
+    fetch('https://pokeapi.co/api/v2/pokemon?limit=250')
         .then(response => response.json())
         .then(json => {
             const pokemonList = json.results
