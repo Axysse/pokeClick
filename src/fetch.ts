@@ -13,7 +13,7 @@ export function fetchPoke() {
         loadingStatus.classList.remove('text-green-600', 'text-red-600');
     }
 
-    fetch('https://pokeapi.co/api/v2/pokemon?limit=150')
+    fetch('https://pokeapi.co/api/v2/pokemon?limit=250')
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
