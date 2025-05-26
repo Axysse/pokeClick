@@ -11,6 +11,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       <button id="counter" type="button"></button>
     </div>
     <p>Nous vivons dans un monde pokèmon!</p>
+    <p>Attention les oreilles!</p>
   </div>
 `
 
