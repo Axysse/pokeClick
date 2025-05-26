@@ -136,7 +136,7 @@ export function fetchPoke() {
                     if (sprite.parentNode) {
                         sprite.parentNode.removeChild(sprite);
                     }
-                }, 7000);
+                }, 15000);
             });
         })
         .catch(error => { // This catch block will now handle image preloading failures as well
